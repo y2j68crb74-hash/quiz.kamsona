@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Kamsona</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #050505;
+            color: #ffffff;
+            margin: 0;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        
+        /* Floating Background System */
+        #floating-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        
+        .floating-item {
+            position: absolute;
+            bottom: -150px;
+            animation: floatUp linear infinite;
+            filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+            10% { opacity: var(--max-opacity, 0.3); }
+            90% { opacity: var(--max-opacity, 0.3); }
+            100% { transform: translateY(-120vh) rotate(360deg); opacity: 0; }
+        }
+
+        /* Custom UI aesthetics */
+        .glass-panel {
+            background: rgba(15, 15, 15, 0.75);
+            border: 1px solid #dc2626; /* Red border */
+            box-shadow: 0 10px 40px rgba(220, 38, 38, 0.2), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .btn-red {
+            background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+            box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
+            transition: all 0.3s ease;
+        }
+        .btn-red:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(220, 38, 38, 0.7);
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+        }
+        .btn-option {
+            background: #171717;
+            border: 1px solid #333;
+            transition: all 0.2s ease;
+        }
+        .btn-option:hover:not(:disabled) {
+            background: #262626;
+            border-color: #dc2626;
+            transform: scale(1.02);
+        }
+        .btn-option.correct {
+            background: #166534; /* Green */
+            border-color: #22c55e;
+            color: white;
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+        }
+        .btn-option.incorrect {
+            background: #991b1b; /* Red */
+            border-color: #ef4444;
+            color: white;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+        }
+        /* Fullscreen canvas for confetti */
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+            display: none;
+        }
+        .fade-in {
+            animation: fadeIn 0.4s ease forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4 relative">
+
+    <!-- Floating Background Elements (Laptops, Pens, SUVs, Cats, Bald Guy) -->
+    <div id="floating-bg"></div>
+
+    <!-- Confetti Canvas -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Main Application Container -->
+    <div id="app" class="w-full max-w-3xl glass-panel rounded-2xl p-6 sm:p-10 relative z-10 fade-in">
+        
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-2 drop-shadow-md">
+                <span class="text-white">Quiz </span><span class="text-red-600">Kamsona</span>
+            </h1>
+            <div class="h-1 w-32 bg-red-600 mx-auto rounded-full mt-4 shadow-[0_0_10px_rgba(220,38,38,0.8)]"></div>
+        </header>
+
+        <!-- SCREEN: START -->
+        <div id="screen-start" class="text-center space-y-6">
+            <p class="text-gray-200 text-lg sm:text-xl font-light leading-relaxed">
+                Sprawdź swoją wiedzę z Kodeksu Postępowania Administracyjnego oraz zarządzania w sektorze publicznym. Przed Tobą 10 losowych pytań z puli 30.
+            </p>
+            <button id="btn-start" class="btn-red text-white font-bold py-4 px-12 rounded-full text-xl mt-8 uppercase tracking-widest">
+                Rozpocznij Grę
+            </button>
+        </div>
+
+        <!-- SCREEN: QUIZ -->
+        <div id="screen-quiz" class="hidden">
+            <div class="flex justify-between items-center mb-6 text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-red-900/50 pb-4">
+                <span id="question-counter">Pytanie 1/10</span>
+                <span id="score-display" class="text-red-500">Punkty: 0</span>
+            </div>
+            
+            <h2 id="question-text" class="text-xl sm:text-2xl font-semibold mb-8 text-white min-h-[5rem] drop-shadow-md leading-snug">
+                <!-- Question loads here -->
+            </h2>
+            
+            <div id="options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Buttons load here -->
+            </div>
+        </div>
+
+        <!-- SCREEN: RESULTS -->
+        <div id="screen-results" class="hidden text-center space-y-6 py-6">
+            <h2 class="text-4xl sm:text-5xl font-extrabold text-white mb-2 drop-shadow-lg">Koniec Gry!</h2>
+            <p class="text-2xl text-gray-300 mb-6">
+                Twój wynik to: <span id="final-score" class="text-red-500 font-black text-6xl block mt-4 drop-shadow-[0_0_15px_rgba(220,38,38,0.6)]">0/10</span>
+            </p>
+            
+            <div id="result-message" class="text-2xl font-bold p-6 bg-black/60 border-2 rounded-xl my-8 mx-auto shadow-2xl backdrop-blur-sm">
+                <!-- Message loads here -->
+            </div>
+            
+            <button id="btn-replay" class="btn-red text-white font-bold py-4 px-10 rounded-full text-lg mt-4 shadow-lg uppercase tracking-wider">
+                Zagraj Ponownie
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // --- DATA: 30 Questions regarding KPA & Public Management ---
+        const allQuestions = [
+            { q: "Jak długo wynosi podstawowy termin na załatwienie sprawy wymagającej postępowania wyjaśniającego?", opts: ["Niezwłocznie", "14 dni", "1 miesiąc", "2 miesiące"], ans: 2 },
+            { q: "Sprawy szczególnie skomplikowane powinny być w KPA załatwione nie później niż w ciągu:", opts: ["1 miesiąca", "2 miesięcy", "3 miesięcy", "Pół roku"], ans: 1 },
+            { q: "Ile czasu ma strona na wniesienie odwołania od decyzji od momentu jej doręczenia?", opts: ["7 dni", "14 dni", "21 dni", "30 dni"], ans: 1 },
+            { q: "Jaki jest termin na wniesienie zażalenia na postanowienie w toku postępowania?", opts: ["3 dni", "7 dni", "14 dni", "Nie ma możliwości zażalenia"], ans: 1 },
+            { q: "Wniesienie odwołania od decyzji w przewidzianym terminie co do zasady:", opts: ["Wstrzymuje wykonanie decyzji", "Nie wstrzymuje wykonania decyzji", "Powoduje nieważność decyzji", "Przenosi sprawę do sądu"], ans: 0 },
+            { q: "Która z tych zasad to tzw. 'złota zasada KPA' (art. 8)?", opts: ["Zasada prawdy obiektywnej", "Zasada pisemności", "Zasada pogłębiania zaufania obywateli", "Zasada dwuinstancyjności"], ans: 2 },
+            { q: "Organem wyższego stopnia właściwym do rozpatrzenia odwołania od decyzji wójta (burmistrza, prezydenta) jest z reguły:", opts: ["Starosta", "Wojewoda", "Samorządowe Kolegium Odwoławcze", "Sąd Administracyjny"], ans: 2 },
+            { q: "Wznowienie postępowania w trybie KPA może dotyczyć wyłącznie:", opts: ["Każdej decyzji", "Decyzji ostatecznej", "Decyzji nieostatecznej", "Tylko postanowień"], ans: 1 },
+            { q: "New Public Management (NPM) - Nowe Zarządzanie Publiczne charakteryzuje się m.in.:", opts: ["Zwiększeniem biurokratyzacji", "Adaptacją metod rynkowych i menedżerskich do administracji", "Skupieniem wyłącznie na przepisach prawa", "Odrzuceniem prywatyzacji"], ans: 1 },
+            { q: "W KPA zaświadczenie powinno być wydane bez zbędnej zwłoki, nie później jednak niż w terminie:", opts: ["3 dni", "7 dni", "14 dni", "1 miesiąca"], ans: 1 },
+            { q: "Kto może być pełnomocnikiem strony w postępowaniu administracyjnym?", opts: ["Tylko adwokat lub radca prawny", "Osoba fizyczna posiadająca zdolność do czynności prawnych", "Wyłącznie członek rodziny", "Tylko osoba wyznaczona przez sąd"], ans: 1 },
+            { q: "Co to jest 'milczące załatwienie sprawy'?", opts: ["Odmowa przez brak odpowiedzi", "Brak kontaktu ze stroną", "Uwzględnienie wniosku, jeśli organ nie wyda decyzji w określonym terminie", "Tylko nieformalne potwierdzenie"], ans: 2 },
+            { q: "Decyzja, od której nie służy odwołanie w administracyjnym toku instancji, to decyzja:", opts: ["Ostateczna", "Prawomocna", "Wykonalna", "Tymczasowa"], ans: 0 },
+            { q: "Właściwość miejscową organu w sprawach dotyczących nieruchomości ustala się według:", opts: ["Miejsca zamieszkania wnioskodawcy", "Miejsca położenia nieruchomości", "Siedziby organu centralnego", "Miejsca zameldowania właściciela"], ans: 1 },
+            { q: "Jako dowód w postępowaniu administracyjnym można dopuścić:", opts: ["Tylko dokumenty urzędowe", "Wyłącznie zeznania świadków", "Wszystko, co może przyczynić się do wyjaśnienia sprawy i nie jest sprzeczne z prawem", "Tylko opinie biegłych"], ans: 2 },
+            { q: "Na bezczynność organu lub przewlekłe prowadzenie postępowania stronie służy prawo wniesienia:", opts: ["Pozwu", "Skargi kasacyjnej", "Zażalenia", "Ponaglenia"], ans: 3 },
+            { q: "Zgodnie z koncepcją Good Governance (dobrego rządzenia), kluczowym elementem jest:", opts: ["Partycypacja i współuczestnictwo obywateli", "Centralizacja władzy", "Ograniczenie dostępu do informacji publicznej", "Zwiększenie liczby procedur"], ans: 0 },
+            { q: "Czym jest metoda CAF stosowana w administracji publicznej?", opts: ["Systemem e-Urząd", "Narzędziem kompleksowego zarządzania jakością", "Metodą księgowości budżetowej", "Kodeksem Etyki Urzędnika"], ans: 1 },
+            { q: "Co nie jest niezbędnym elementem każdej decyzji administracyjnej?", opts: ["Oznaczenie organu wydającego", "Powołanie podstawy prawnej", "Zgoda strony na rozstrzygnięcie", "Podpis z podaniem imienia i nazwiska"], ans: 2 },
+            { q: "Ugodę administracyjną można zawrzeć:", opts: ["Zawsze, w każdej sprawie", "Jeżeli charakter sprawy na to pozwala i nie sprzeciwiają się temu przepisy prawa", "Tylko w sprawach podatkowych", "Tylko przed sądem"], ans: 1 },
+            { q: "W razie uchybienia terminu do wniesienia odwołania z ważnej przyczyny, strona może złożyć prośbę o:", opts: ["Przedłużenie terminu", "Przywrócenie terminu", "Zawieszenie terminu", "Wydanie nowej decyzji"], ans: 1 },
+            { q: "Jeżeli organ z urzędu lub na wniosek strony stwierdzi nieważność decyzji, oznacza to, że usunięto ją z obrotu prawnego:", opts: ["Ze skutkiem od dnia dzisiejszego (ex nunc)", "Ze skutkiem od samego początku, od momentu jej wydania (ex tunc)", "Tylko w części zaskarżonej", "Dopiero po wyroku sądu"], ans: 1 },
+            { q: "Który podmiot nie jest na prawach strony w KPA, ale może nim zostać w obronie interesu społecznego?", opts: ["Sąsiad wnioskodawcy", "Organizacja społeczna", "Każdy obywatel kraju", "Zagraniczny inwestor"], ans: 1 },
+            { q: "Pracownik organu podlega obligatoryjnemu wyłączeniu od udziału w postępowaniu, jeżeli sprawa dotyczy:", opts: ["Każdego mieszkańca jego gminy", "Jego małżonka lub krewnego do drugiego stopnia", "Sprawy, w której kiedyś doradzał prywatnie 10 lat temu (poza aktami)", "Kwestii strategicznych dla urzędu"], ans: 1 },
+            { q: "Decyzji może być nadany rygor natychmiastowej wykonalności ze względu na m.in.:", opts: ["Ochronę zdrowia lub życia ludzkiego", "Wygodę i harmonogram urzędu", "Wniosek świadka", "Brak czasu na odwołanie"], ans: 0 },
+            { q: "Zasada przekonywania z art. 11 KPA zobowiązuje organy administracji do:", opts: ["Zmuszania obywateli do przestrzegania prawa", "Wyjaśniania stronom zasadności przesłanek rozstrzygnięcia", "Podejmowania decyzji zgodnie z wolą tłumu", "Uzasadniania jedynie decyzji negatywnych"], ans: 1 },
+            { q: "Skargę na podstawie KPA można złożyć:", opts: ["Tylko we własnym imieniu", "W imieniu własnym, innej osoby za jej zgodą lub w interesie publicznym", "Tylko za pośrednictwem pełnomocnika", "Tylko do Wojewody"], ans: 1 },
+            { q: "Postanowienia w toku postępowania służą do:", opts: ["Rozstrzygania o istocie sprawy", "Rozstrzygania kwestii proceduralnych w toku postępowania", "Tylko i wyłącznie do zamykania sprawy", "Przenoszenia sprawy do innego organu z urzędu na zawsze"], ans: 1 },
+            { q: "Czym jest audyt wewnętrzny w sektorze publicznym (zarządzanie)?", opts: ["Kontrolą zewnętrzną z NIK", "Niezależną oceną gospodarki finansowej i procesów zarządzania w jednostce", "Zewnętrznym badaniem zadowolenia obywateli", "Tylko oceną roczną pracowników"], ans: 1 },
+            { q: "Błąd w procedurze administracyjnej powodujący, że decyzja została wydana przez organ niewłaściwy skutkuje w KPA:", opts: ["Możliwością stwierdzenia nieważności decyzji", "Automatyczną karą finansową dla organu", "Wymogiem ponownego napisania tylko uzasadnienia", "Możliwością natychmiastowej ugody"], ans: 0 }
+        ];
+
+        // --- BACKGROUND FLOATING ANIMATIONS ---
+        const baldGuySvg = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+                <!-- Head -->
+                <path d="M20,45 A30,30 0 1,1 80,45 A30,45 0 0,1 20,45" fill="#fcdbb5" />
+                <!-- Beard -->
+                <path d="M20,45 Q20,105 50,105 Q80,105 80,45 Q65,65 50,65 Q35,65 20,45" fill="#222" />
+                <!-- Sunglasses -->
+                <rect x="22" y="38" width="25" height="15" rx="4" fill="#000" />
+                <rect x="53" y="38" width="25" height="15" rx="4" fill="#000" />
+                <!-- Bridge -->
+                <path d="M47,43 L53,43" stroke="#000" stroke-width="4" />
+            </svg>
+        `;
+
+        const floatingIcons = ['💻', '🖊️', '🚙', '🐈', baldGuySvg];
+
+        function initFloatingBackground() {
+            const container = document.getElementById('floating-bg');
+            container.innerHTML = ''; // clear if re-init
+            const numItems = 25; // How many items floating around
+            
+            for (let i = 0; i < numItems; i++) {
+                const el = document.createElement('div');
+                el.className = 'floating-item';
+                
+                // Randomly select icon
+                const icon = floatingIcons[Math.floor(Math.random() * floatingIcons.length)];
+                el.innerHTML = icon;
+                
+                // Randomize properties
+                const size = Math.random() * 40 + 30; // 30px to 70px
+                const leftPos = Math.random() * 100; // 0vw to 100vw
+                const duration = Math.random() * 15 + 15; // 15s to 30s
+                const delay = Math.random() * -30; // Negative delay to start immediately at different heights
+                const maxOpacity = Math.random() * 0.2 + 0.1; // 0.1 to 0.3 opacity
+
+                el.style.width = `${size}px`;
+                el.style.height = `${size}px`;
+                el.style.fontSize = `${size * 0.8}px`; // for emojis
+                el.style.left = `${leftPos}vw`;
+                el.style.animationDuration = `${duration}s`;
+                el.style.animationDelay = `${delay}s`;
+                el.style.setProperty('--max-opacity', maxOpacity);
+                
+                container.appendChild(el);
+            }
+        }
+
+        // Initialize background once DOM is loaded
+        initFloatingBackground();
+
+
+        // --- IMPROVED WEB AUDIO API (SYNTH) ---
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playOscillator(freq, type, duration, vol, startTime, slideTo = null) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, startTime);
+            
+            if (slideTo) {
+                osc.frequency.exponentialRampToValueAtTime(slideTo, startTime + duration);
+            }
+
+            // Envelope to prevent clicking
+            gain.gain.setValueAtTime(0, startTime);
+            gain.gain.linearRampToValueAtTime(vol, startTime + 0.05); // Attack
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration); // Decay
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start(startTime);
+            osc.stop(startTime + duration);
+        }
+
+        function playChord(frequencies, type, duration, vol, delaySeconds = 0) {
+            if (!audioCtx) return;
+            const startTime = audioCtx.currentTime + delaySeconds;
+            frequencies.forEach(freq => {
+                playOscillator(freq, type, duration, vol / frequencies.length, startTime);
+            });
+        }
+
+        const Sounds = {
+            click: () => {
+                if(!audioCtx) return;
+                playOscillator(800, 'sine', 0.1, 0.05, audioCtx.currentTime);
+            },
+            correct: () => {
+                if(!audioCtx) return;
+                // Bright, uplifting arpeggio & chord (C major: C5, E5, G5)
+                const t = audioCtx.currentTime;
+                playOscillator(523.25, 'sine', 0.15, 0.1, t);
+                playOscillator(659.25, 'sine', 0.15, 0.1, t + 0.1);
+                playOscillator(783.99, 'sine', 0.15, 0.1, t + 0.2);
+                playChord([523.25, 659.25, 1046.50], 'triangle', 0.8, 0.15, 0.3); // Sustained chord
+            },
+            incorrect: () => {
+                if(!audioCtx) return;
+                // Dissonant, low buzz (Sawtooth cluster)
+                const t = audioCtx.currentTime;
+                playChord([120, 126, 131], 'sawtooth', 0.5, 0.15, 0);
+            },
+            victory: () => {
+                if(!audioCtx) return;
+                // Triumph fanfare
+                const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
+                notes.forEach((freq, i) => {
+                    playOscillator(freq, 'square', 0.15, 0.05, audioCtx.currentTime + i * 0.15);
+                });
+                playChord([440, 554.37, 659.25, 880], 'triangle', 1.5, 0.15, notes.length * 0.15);
+            },
+            good: () => {
+                if(!audioCtx) return;
+                // Pleasant major chord
+                playChord([392.00, 493.88, 587.33], 'triangle', 1.0, 0.1); // G major
+            },
+            fail: () => {
+                if(!audioCtx) return;
+                // Descending sad trombone
+                const t = audioCtx.currentTime;
+                playOscillator(300, 'triangle', 0.4, 0.1, t, 280);
+                playOscillator(280, 'triangle', 0.4, 0.1, t + 0.4, 260);
+                playOscillator(260, 'triangle', 1.0, 0.1, t + 0.8, 200);
+            }
+        };
+
+
+        // --- CONFETTI & CATS ANIMATION (CANVAS) ---
+        const canvas = document.getElementById('confetti-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let animationId;
+        const catEmojis = ['🐈', '🐈‍⬛', '😸', '😻', '😼'];
+        const colors = ['#dc2626', '#ffffff', '#991b1b', '#f87171', '#ff0000', '#facc15']; // Red/White/Gold
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function startConfetti() {
+            canvas.style.display = 'block';
+            resizeCanvas();
+            particles = [];
+            for (let i = 0; i < 200; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    r: Math.random() * 6 + 4,
+                    dx: Math.random() * 4 - 2,
+                    dy: Math.random() * 3 + 2,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    tilt: Math.floor(Math.random() * 10) - 10,
+                    tiltAngle: 0,
+                    tiltAngleInc: (Math.random() * 0.07) + 0.05,
+                    isCat: Math.random() > 0.85,
+                    catText: catEmojis[Math.floor(Math.random() * catEmojis.length)]
+                });
+            }
+            if (animationId) cancelAnimationFrame(animationId);
+            animateConfetti();
+        }
+
+        function animateConfetti() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let active = false;
+            
+            for (let p of particles) {
+                p.tiltAngle += p.tiltAngleInc;
+                p.y += p.dy;
+                p.x += Math.sin(p.tiltAngle) * 2;
+                
+                // Continuous loop by resetting to top
+                if (p.y > canvas.height + 50) {
+                    p.y = -50;
+                    p.x = Math.random() * canvas.width;
+                }
+                
+                active = true;
+
+                if (p.isCat) {
+                    ctx.font = '32px Arial';
+                    ctx.fillText(p.catText, p.x, p.y);
+                } else {
+                    ctx.beginPath();
+                    ctx.lineWidth = p.r;
+                    ctx.strokeStyle = p.color;
+                    ctx.moveTo(p.x + p.tilt + p.r, p.y);
+                    ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r);
+                    ctx.stroke();
+                }
+            }
+            if (active) {
+                animationId = requestAnimationFrame(animateConfetti);
+            }
+        }
+
+        function stopConfetti() {
+            if (animationId) cancelAnimationFrame(animationId);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.style.display = 'none';
+        }
+
+
+        // --- GAME STATE & LOGIC ---
+        let gameQuestions = [];
+        let currentIndex = 0;
+        let score = 0;
+        let isAnswering = false;
+
+        const elStart = document.getElementById('screen-start');
+        const elQuiz = document.getElementById('screen-quiz');
+        const elResults = document.getElementById('screen-results');
+        
+        const elQuestionText = document.getElementById('question-text');
+        const elOptionsCont = document.getElementById('options-container');
+        const elQuestionCounter = document.getElementById('question-counter');
+        const elScoreDisplay = document.getElementById('score-display');
+        
+        const btnStart = document.getElementById('btn-start');
+        const btnReplay = document.getElementById('btn-replay');
+
+        // Helpers
+        function shuffle(array) {
+            let arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function setScreen(screenId) {
+            [elStart, elQuiz, elResults].forEach(el => el.classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+            document.getElementById(screenId).classList.add('fade-in');
+        }
+
+        // Core Functions
+        function startGame() {
+            initAudio();
+            Sounds.click();
+            stopConfetti();
+            
+            // Pick 10 random questions
+            gameQuestions = shuffle(allQuestions).slice(0, 10);
+            currentIndex = 0;
+            score = 0;
+            
+            setScreen('screen-quiz');
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            isAnswering = false;
+            const currentQ = gameQuestions[currentIndex];
+            
+            elQuestionCounter.textContent = `Pytanie ${currentIndex + 1}/10`;
+            elScoreDisplay.textContent = `Punkty: ${score}`;
+            elQuestionText.textContent = currentQ.q;
+            
+            elOptionsCont.innerHTML = '';
+            
+            currentQ.opts.forEach((optText, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-option w-full text-left p-4 rounded-xl text-lg font-medium outline-none focus:ring-2 focus:ring-red-500';
+                btn.textContent = optText;
+                btn.onclick = () => handleAnswer(idx, btn);
+                elOptionsCont.appendChild(btn);
+            });
+        }
+
+        function handleAnswer(selectedIndex, btnElement) {
+            if (isAnswering) return;
+            isAnswering = true;
+            
+            const currentQ = gameQuestions[currentIndex];
+            const isCorrect = (selectedIndex === currentQ.ans);
+            const allButtons = elOptionsCont.querySelectorAll('button');
+            
+            // Disable all buttons immediately
+            allButtons.forEach(b => {
+                b.disabled = true;
+                b.classList.remove('hover:bg-[#262626]');
+            });
+
+            if (isCorrect) {
+                Sounds.correct();
+                btnElement.classList.add('correct');
+                score++;
+                elScoreDisplay.textContent = `Punkty: ${score}`;
+            } else {
+                Sounds.incorrect();
+                btnElement.classList.add('incorrect');
+                // Highlight the correct one
+                allButtons[currentQ.ans].classList.add('correct');
+            }
+
+            // Wait a bit, then move to next
+            setTimeout(() => {
+                currentIndex++;
+                if (currentIndex >= 10) {
+                    showResults();
+                } else {
+                    renderQuestion();
+                }
+            }, 1800);
+        }
+
+        function showResults() {
+            setScreen('screen-results');
+            document.getElementById('final-score').textContent = `${score}/10`;
+            
+            const msgEl = document.getElementById('result-message');
+            msgEl.className = 'text-2xl sm:text-3xl font-bold p-8 border-2 rounded-2xl my-8 mx-auto w-full max-w-xl transition-all shadow-2xl backdrop-blur-md';
+
+            if (score === 10) {
+                msgEl.textContent = "Suoer mój Przyjacielu, jesteś THE BEST w swoim fachu!";
+                msgEl.classList.add('bg-red-900/40', 'border-red-500', 'text-white', 'shadow-red-500/50');
+                Sounds.victory();
+                startConfetti();
+            } else if (score >= 6) {
+                msgEl.textContent = "No no , nieźle ale potrafisz lepiej!";
+                msgEl.classList.add('bg-yellow-900/40', 'border-yellow-500', 'text-yellow-400', 'shadow-yellow-500/20');
+                Sounds.good();
+            } else if (score >= 3) {
+                msgEl.textContent = "Ej no co jest ? Wszystko git ? Próbuj dalej !";
+                msgEl.classList.add('bg-orange-900/40', 'border-orange-600', 'text-orange-400', 'shadow-orange-600/20');
+                Sounds.fail(); // mild fail
+            } else {
+                msgEl.textContent = "Nie no Mordo, nie kantuj mnie tu, wiem że potrafisz to lepiej!";
+                msgEl.classList.add('bg-zinc-900/80', 'border-zinc-500', 'text-zinc-300');
+                Sounds.fail(); // full fail
+            }
+        }
+
+        // Event Listeners
+        btnStart.addEventListener('click', startGame);
+        btnReplay.addEventListener('click', startGame);
+
+    </script>
+</body>
+</html>
